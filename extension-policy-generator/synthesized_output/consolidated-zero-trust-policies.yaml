@@ -1,0 +1,570 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: default-deny-all
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  # Empty spec denies all ingress traffic by default in Istio
+  {}
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-frontend-edge-ingress
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: front-end
+  action: ALLOW
+  rules:
+  - to:
+    - operation:
+        ports: ["8079", "80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-carts
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: carts
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/cart"]
+        ports: ["80"]
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/cart"]
+        ports: ["80"]
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["DELETE"]
+        paths: ["/cart/item/*"]
+        ports: ["80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-carts-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: carts-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/carts"]
+    to:
+    - operation:
+        ports: ["27017"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-catalogue
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: catalogue
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/catalogue", "/catalogue/*", "/catalogue/size", "/tags"]
+        ports: ["80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-catalogue-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: catalogue-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/catalogue"]
+    to:
+    - operation:
+        ports: ["3306"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-orders
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: orders
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/orders"]
+        ports: ["80"]
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/orders"]
+        ports: ["80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-orders-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: orders-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/orders"]
+    to:
+    - operation:
+        ports: ["27017"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-payment
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: payment
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/orders"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/paymentAuth"]
+        ports: ["80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-rabbitmq
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: rabbitmq
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/shipping"]
+    to:
+    - operation:
+        ports: ["5672"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-shipping
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: shipping
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/orders"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/shipping"]
+        ports: ["80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-user
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: user
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/address", "/cards", "/customers/*"]
+        ports: ["80"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-to-user-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  selector:
+    matchLabels:
+      name: user-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["spiffe://cluster.local/ns/sock-shop/sa/user"]
+    to:
+    - operation:
+        ports: ["27017"]
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-system-core-egress
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow Istiod mTLS CA certificate exchange
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: istio-system
+    ports:
+    - protocol: TCP
+      port: 15012
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-carts
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: carts
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-carts-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: carts-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: carts
+    ports:
+    - protocol: TCP
+      port: 27017
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-catalogue
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: catalogue
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-catalogue-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: catalogue-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: catalogue
+    ports:
+    - protocol: TCP
+      port: 3306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-orders
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: orders
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-orders-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: orders-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 27017
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-payment
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: payment
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-rabbitmq
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: rabbitmq
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: shipping
+    ports:
+    - protocol: TCP
+      port: 5672
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-shipping
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: shipping
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-user
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: user
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-user-db
+  namespace: sock-shop
+  labels:
+    app.kubernetes.io/managed-by: zero-trust-policy-synthesizer
+spec:
+  podSelector:
+    matchLabels:
+      name: user-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: user
+    ports:
+    - protocol: TCP
+      port: 27017

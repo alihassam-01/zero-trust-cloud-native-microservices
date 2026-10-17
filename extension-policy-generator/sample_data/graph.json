@@ -1,0 +1,198 @@
+{
+  "metadata": {
+    "total_records_processed": 19,
+    "node_count": 12,
+    "edge_count": 11
+  },
+  "nodes": [
+    "carts",
+    "carts-db",
+    "catalogue",
+    "catalogue-db",
+    "front-end",
+    "orders",
+    "orders-db",
+    "payment",
+    "rabbitmq",
+    "shipping",
+    "user",
+    "user-db"
+  ],
+  "edges": [
+    {
+      "source": "front-end",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/front-end",
+      "destination": "carts",
+      "destination_namespace": "sock-shop",
+      "destination_port": 80,
+      "protocol": "HTTP",
+      "operations": [
+        {
+          "method": "GET",
+          "paths": [
+            "/cart"
+          ]
+        },
+        {
+          "method": "POST",
+          "paths": [
+            "/cart"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "paths": [
+            "/cart/item/*"
+          ]
+        }
+      ],
+      "call_count": 3
+    },
+    {
+      "source": "carts",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/carts",
+      "destination": "carts-db",
+      "destination_namespace": "sock-shop",
+      "destination_port": 27017,
+      "protocol": "TCP",
+      "operations": [],
+      "call_count": 1
+    },
+    {
+      "source": "front-end",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/front-end",
+      "destination": "catalogue",
+      "destination_namespace": "sock-shop",
+      "destination_port": 80,
+      "protocol": "HTTP",
+      "operations": [
+        {
+          "method": "GET",
+          "paths": [
+            "/catalogue",
+            "/catalogue/*",
+            "/catalogue/size",
+            "/tags"
+          ]
+        }
+      ],
+      "call_count": 4
+    },
+    {
+      "source": "catalogue",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/catalogue",
+      "destination": "catalogue-db",
+      "destination_namespace": "sock-shop",
+      "destination_port": 3306,
+      "protocol": "TCP",
+      "operations": [],
+      "call_count": 1
+    },
+    {
+      "source": "front-end",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/front-end",
+      "destination": "orders",
+      "destination_namespace": "sock-shop",
+      "destination_port": 80,
+      "protocol": "HTTP",
+      "operations": [
+        {
+          "method": "GET",
+          "paths": [
+            "/orders"
+          ]
+        },
+        {
+          "method": "POST",
+          "paths": [
+            "/orders"
+          ]
+        }
+      ],
+      "call_count": 2
+    },
+    {
+      "source": "orders",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/orders",
+      "destination": "orders-db",
+      "destination_namespace": "sock-shop",
+      "destination_port": 27017,
+      "protocol": "TCP",
+      "operations": [],
+      "call_count": 1
+    },
+    {
+      "source": "orders",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/orders",
+      "destination": "payment",
+      "destination_namespace": "sock-shop",
+      "destination_port": 80,
+      "protocol": "HTTP",
+      "operations": [
+        {
+          "method": "POST",
+          "paths": [
+            "/paymentAuth"
+          ]
+        }
+      ],
+      "call_count": 1
+    },
+    {
+      "source": "shipping",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/shipping",
+      "destination": "rabbitmq",
+      "destination_namespace": "sock-shop",
+      "destination_port": 5672,
+      "protocol": "TCP",
+      "operations": [],
+      "call_count": 1
+    },
+    {
+      "source": "orders",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/orders",
+      "destination": "shipping",
+      "destination_namespace": "sock-shop",
+      "destination_port": 80,
+      "protocol": "HTTP",
+      "operations": [
+        {
+          "method": "POST",
+          "paths": [
+            "/shipping"
+          ]
+        }
+      ],
+      "call_count": 1
+    },
+    {
+      "source": "front-end",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/front-end",
+      "destination": "user",
+      "destination_namespace": "sock-shop",
+      "destination_port": 80,
+      "protocol": "HTTP",
+      "operations": [
+        {
+          "method": "GET",
+          "paths": [
+            "/address",
+            "/cards",
+            "/customers/*"
+          ]
+        }
+      ],
+      "call_count": 3
+    },
+    {
+      "source": "user",
+      "source_principal": "spiffe://cluster.local/ns/sock-shop/sa/user",
+      "destination": "user-db",
+      "destination_namespace": "sock-shop",
+      "destination_port": 27017,
+      "protocol": "TCP",
+      "operations": [],
+      "call_count": 1
+    }
+  ]
+}
