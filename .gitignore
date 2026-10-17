@@ -19,3 +19,7 @@ venv/
 
 # Environment / local configs
 .env
+
+# Legacy exploratory scratch files
+week3/
+*.odt
