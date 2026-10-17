@@ -1,0 +1,21 @@
+# Istio binaries and download tarballs
+istio-*/
+*.tar.gz
+*.tgz
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Environment / local configs
+.env
