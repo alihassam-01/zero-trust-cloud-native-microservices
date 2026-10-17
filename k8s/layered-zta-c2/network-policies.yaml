@@ -1,0 +1,377 @@
+# ==============================================================================
+# C2 Layered Zero Trust: L3/L4 Kubernetes Network Policies (Defense-in-Depth)
+# Enforces transport-layer segmentation to prevent raw TCP socket bypasses
+# ==============================================================================
+
+---
+# 1. Default Deny Ingress across sock-shop namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: sock-shop
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+# 2. Allow Ingress to front-end (Edge Tier)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-frontend
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: front-end
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8079
+    - protocol: TCP
+      port: 15006
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 3. Allow Ingress to catalogue
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-catalogue
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: catalogue
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 4. Allow Ingress to catalogue-db (MySQL 3306) ONLY from catalogue
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-catalogue-db
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: catalogue-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: catalogue
+    ports:
+    - protocol: TCP
+      port: 3306
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 5. Allow Ingress to carts
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-carts
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: carts
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 6. Allow Ingress to carts-db (MongoDB 27017) ONLY from carts
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-carts-db
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: carts-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: carts
+    ports:
+    - protocol: TCP
+      port: 27017
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 7. Allow Ingress to orders
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-orders
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: orders
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 8. Allow Ingress to orders-db (MongoDB 27017) ONLY from orders
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-orders-db
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: orders-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 27017
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 9. Allow Ingress to payment (HTTP 80) ONLY from orders
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-payment
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: payment
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 10. Allow Ingress to shipping (HTTP 80) ONLY from orders
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-shipping
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: shipping
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 11. Allow Ingress to user
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-user
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: user
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    - podSelector:
+        matchLabels:
+          name: orders
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 12. Allow Ingress to user-db (MongoDB 27017) ONLY from user
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-user-db
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: user-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: user
+    ports:
+    - protocol: TCP
+      port: 27017
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 13. Allow Ingress to session-db (Redis 6379) ONLY from front-end
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-session-db
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: session-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: front-end
+    ports:
+    - protocol: TCP
+      port: 6379
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090
+
+---
+# 14. Allow Ingress to rabbitmq ONLY from shipping and queue-master
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-rabbitmq
+  namespace: sock-shop
+spec:
+  podSelector:
+    matchLabels:
+      name: rabbitmq
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: shipping
+    - podSelector:
+        matchLabels:
+          name: queue-master
+    ports:
+    - protocol: TCP
+      port: 5672
+    - protocol: TCP
+      port: 9090
+  - ports:
+    - protocol: TCP
+      port: 15021
+    - protocol: TCP
+      port: 15090

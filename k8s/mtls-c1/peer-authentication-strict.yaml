@@ -1,0 +1,24 @@
+---
+# Global STRICT mTLS for all backend east-west communication
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: sock-shop
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Edge Ingress allowance: permits external ingress/NodePort traffic on front-end
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: frontend-edge
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: front-end
+  mtls:
+    mode: PERMISSIVE

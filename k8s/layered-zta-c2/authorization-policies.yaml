@@ -1,0 +1,280 @@
+# ==============================================================================
+# C2 Layered Zero Trust: Least-Privilege Istio Authorization Policies
+# Enforces NIST SP 800-207 Tenets 1, 4, and 6:
+# - All communication evaluated at Layer 7 based on cryptographic SPIFFE identity
+# - Default Deny posture across the entire sock-shop namespace
+# - Explicit whitelist granted only to legitimate operational dependencies
+# ==============================================================================
+
+---
+# 1. Global Default-Deny within sock-shop namespace
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: default-deny
+  namespace: sock-shop
+spec:
+  {}
+
+---
+# 2. Allow Ingress traffic to front-end
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-front-end
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: front-end
+  action: ALLOW
+  rules:
+  - to:
+    - operation:
+        ports: ["80", "8079"]
+
+---
+# 3. Allow front-end to access catalogue
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-catalogue
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: catalogue
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        ports: ["80"]
+
+---
+# 4. Allow front-end and orders to access carts
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-carts
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: carts
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/sock-shop/sa/front-end"
+        - "cluster.local/ns/sock-shop/sa/orders"
+    to:
+    - operation:
+        ports: ["80"]
+
+---
+# 5. Allow front-end to access orders
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-orders
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: orders
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        ports: ["80"]
+
+---
+# 6. Allow ONLY orders to access payment (Blocks front-end direct access!)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-payment
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: payment
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/orders"]
+    to:
+    - operation:
+        ports: ["80"]
+
+---
+# 7. Allow ONLY orders to access shipping (Blocks front-end direct access!)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-shipping
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: shipping
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/orders"]
+    to:
+    - operation:
+        ports: ["80"]
+
+---
+# 8. Allow front-end and orders to access user
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-user
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: user
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/sock-shop/sa/front-end"
+        - "cluster.local/ns/sock-shop/sa/orders"
+    to:
+    - operation:
+        ports: ["80"]
+
+---
+# 9. Allow ONLY front-end to access session-db (Redis)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-session-db
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: session-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/front-end"]
+    to:
+    - operation:
+        ports: ["6379"]
+
+---
+# 10. Allow ONLY catalogue to access catalogue-db (MySQL)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-catalogue-db
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: catalogue-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/catalogue"]
+    to:
+    - operation:
+        ports: ["3306"]
+
+---
+# 11. Allow ONLY carts to access carts-db (MongoDB)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-carts-db
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: carts-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/carts"]
+    to:
+    - operation:
+        ports: ["27017"]
+
+---
+# 12. Allow ONLY orders to access orders-db (MongoDB)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-orders-db
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: orders-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/orders"]
+    to:
+    - operation:
+        ports: ["27017"]
+
+---
+# 13. Allow ONLY user to access user-db (MongoDB)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-user-db
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: user-db
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/sock-shop/sa/user"]
+    to:
+    - operation:
+        ports: ["27017"]
+
+---
+# 14. Allow shipping and queue-master to access rabbitmq
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-rabbitmq
+  namespace: sock-shop
+spec:
+  selector:
+    matchLabels:
+      name: rabbitmq
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/sock-shop/sa/shipping"
+        - "cluster.local/ns/sock-shop/sa/queue-master"
+    to:
+    - operation:
+        ports: ["5672", "9090"]

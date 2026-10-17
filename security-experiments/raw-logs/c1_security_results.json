@@ -1,0 +1,153 @@
+{
+  "scenario": "c1",
+  "timestamp": 1792272395.6366522,
+  "pod_name": "front-end-85b9d7944-mtctb",
+  "unauthorized_attempted": 9,
+  "unauthorized_blocked": 0,
+  "lmcr": 0.0,
+  "datastore_attempted": 5,
+  "datastore_blocked": 0,
+  "dsis": 0.0,
+  "results": [
+    {
+      "id": "AV-01",
+      "name": "Legitimate Catalogue Browse",
+      "type": "HTTP",
+      "is_unauthorized": false,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "200",
+      "detail": "Reached (HTTP 200)"
+    },
+    {
+      "id": "AV-02",
+      "name": "Legitimate Carts Access",
+      "type": "HTTP",
+      "is_unauthorized": false,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "500",
+      "detail": "Reached (HTTP 500)"
+    },
+    {
+      "id": "AV-03",
+      "name": "Legitimate Orders Access",
+      "type": "HTTP",
+      "is_unauthorized": false,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "500",
+      "detail": "Reached (HTTP 500)"
+    },
+    {
+      "id": "AV-04",
+      "name": "Legitimate User Profile Access",
+      "type": "HTTP",
+      "is_unauthorized": false,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "200",
+      "detail": "Reached (HTTP 200)"
+    },
+    {
+      "id": "AV-05",
+      "name": "Legitimate Session-DB Store",
+      "type": "TCP",
+      "is_unauthorized": false,
+      "is_datastore": true,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 6379 Established"
+    },
+    {
+      "id": "AV-06",
+      "name": "Unauthorized Direct Payment Trigger",
+      "type": "HTTP",
+      "is_unauthorized": true,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "500",
+      "detail": "Reached (HTTP 500)"
+    },
+    {
+      "id": "AV-07",
+      "name": "Unauthorized Direct Shipping Trigger",
+      "type": "HTTP",
+      "is_unauthorized": true,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "400",
+      "detail": "Reached (HTTP 400)"
+    },
+    {
+      "id": "AV-08",
+      "name": "Direct Orders-DB Exfiltration",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": true,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 27017 Established"
+    },
+    {
+      "id": "AV-09",
+      "name": "Direct Carts-DB Exfiltration",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": true,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 27017 Established"
+    },
+    {
+      "id": "AV-10",
+      "name": "Direct Catalogue-DB SQL Injection",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": true,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 3306 Established"
+    },
+    {
+      "id": "AV-11",
+      "name": "Direct User-DB Exfiltration",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": true,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 27017 Established"
+    },
+    {
+      "id": "AV-12",
+      "name": "Message Broker Poisoning",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": true,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 5672 Established"
+    },
+    {
+      "id": "AV-13",
+      "name": "Cross-Namespace Probe (kube-system)",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 53 Established"
+    },
+    {
+      "id": "AV-14",
+      "name": "Cross-Namespace Probe (istio-system)",
+      "type": "TCP",
+      "is_unauthorized": true,
+      "is_datastore": false,
+      "is_blocked": false,
+      "status_code": "NO_RESPONSE",
+      "detail": "Port 15012 Established"
+    }
+  ]
+}
