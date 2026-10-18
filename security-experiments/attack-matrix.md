@@ -22,17 +22,17 @@ From this compromised foothold, the attacker systematically executes 14 controll
 ## 2. Empirical Attack Evaluation Matrix
 
 The table below presents the verified empirical outcomes across the three experimental architectures:
-- **$C_0$ (Baseline Perimeter):** Unrestricted east-west network, default perimeter security.
-- **$C_1$ (STRICT mTLS):** Workload identity & transport encryption active (Citadel SPIFFE certs), no L7 authorization rules.
-- **$C_2$ (Layered Zero Trust):** STRICT mTLS + ServiceAccount-level least-privilege `AuthorizationPolicy` + L3/L4 `NetworkPolicy`.
+- **C0 (Baseline Perimeter):** Unrestricted east-west network, default perimeter security.
+- **C1 (STRICT mTLS):** Workload identity & transport encryption active (Citadel SPIFFE certs), no L7 authorization rules.
+- **C2 (Layered Zero Trust):** STRICT mTLS + ServiceAccount-level least-privilege `AuthorizationPolicy` + L3/L4 `NetworkPolicy`.
 
-| ID | Attack Vector Description | Protocol & Target Port | Authorization Classification | $C_0$ (Baseline) | $C_1$ (STRICT mTLS) | $C_2$ (Layered ZTA) | Security Enforcement Mechanism ($C_2$) |
+| ID | Attack Vector Description | Protocol & Target Port | Authorization Classification | C0 (Baseline) | C1 (STRICT mTLS) | C2 (Layered ZTA) | Security Enforcement Mechanism (C2) |
 | :--- | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
 | **AV-01** | Legitimate Catalog Browse | HTTP/80 (`catalogue/catalogue`) | **Legitimate (Allowed)** | 🔴 Reached (200) | 🔴 Reached (200) | 🟢 **Allowed (200)** | Policy `allow-catalogue` permits caller SA. |
 | **AV-02** | Legitimate Cart Item Query | HTTP/80 (`carts/carts/1`) | **Legitimate (Allowed)** | 🔴 Reached (500) | 🔴 Reached (500) | 🟢 **Allowed (200/500)** | Policy `allow-carts` permits caller SA. |
 | **AV-03** | Legitimate Customer Orders API | HTTP/80 (`orders/orders`) | **Legitimate (Allowed)** | 🔴 Reached (500) | 🔴 Reached (500) | 🟢 **Allowed (500)** | Policy `allow-orders` permits caller SA. |
 | **AV-04** | Legitimate User Profile Query | HTTP/80 (`user/customers`) | **Legitimate (Allowed)** | 🔴 Reached (200) | 🔴 Reached (200) | 🟢 **Allowed (200)** | Policy `allow-user` permits caller SA. |
-| **AV-05** | Legitimate Session Store (Redis) | TCP/6379 (`session-db:6379`) | **Legitimate (Allowed)** | 🔴 Connected | 🔴 Connected | 🟢 **Allowed (Open)** | L4 NetPol allows front-end $\rightarrow$ session-db. |
+| **AV-05** | Legitimate Session Store (Redis) | TCP/6379 (`session-db:6379`) | **Legitimate (Allowed)** | 🔴 Connected | 🔴 Connected | 🟢 **Allowed (Open)** | L4 NetPol allows front-end → session-db. |
 | **AV-06** | Direct Payment Trigger (Bypass Orders) | HTTP/80 (`payment/paymentAuth`) | **Unauthorized (Privilege Escalation)** | 🔴 **Reached (500)** | 🔴 **Reached (500)** | 🟢 **BLOCKED (503/Timeout)** | L7 AuthPolicy rejects SA `front-end`; L4 NetPol drops. |
 | **AV-07** | Direct Shipping Trigger (Bypass Orders) | HTTP/80 (`shipping/shipping`) | **Unauthorized (Privilege Escalation)** | 🔴 **Reached (400)** | 🔴 **Reached (400)** | 🟢 **BLOCKED (503/Timeout)** | L7 AuthPolicy rejects SA `front-end`; L4 NetPol drops. |
 | **AV-08** | Direct Orders-DB Extraction (MongoDB) | TCP/27017 (`orders-db:27017`) | **Unauthorized (Data Breach)** | 🔴 **Connected (Open)** | 🔴 **Connected (Open)** | 🟢 **BLOCKED (ECONNRESET)** | Envoy L4 RBAC terminates socket upon payload write. |
@@ -47,9 +47,9 @@ The table below presents the verified empirical outcomes across the three experi
 
 ## 3. Quantitative Security Metrics Comparison
 
-| Quantitative Metric | Definition | Baseline ($C_0$) | STRICT mTLS ($C_1$) | Layered ZTA ($C_2$) | Improvement ($C_0 \rightarrow C_2$) |
+| Quantitative Metric | Definition | Baseline (C0) | STRICT mTLS (C1) | Layered ZTA (C2) | Improvement (C0 → C2) |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Lateral Movement Containment Ratio ($LMCR$)** | $\frac{\text{Blocked Unauthorized Vectors}}{\text{Total Unauthorized Vectors}}$ | **0.00%** (0/9) | **0.00%** (0/9) | **88.89% - 100%** | **+88.9% - +100%** |
-| **Data-Store Isolation Score ($DSIS$)** | $\frac{\text{Protected Persistence Tiers}}{\text{Total Persistence Tiers}}$ | **0.00%** (0/5) | **0.00%** (0/5) | **100.00%** (5/5) | **+100.0%** |
-| **Blast Radius (Accessible DBs from Front-End)** | Count of directly querable data stores | 5 / 5 Databases | 5 / 5 Databases | **0 / 5 Databases** | **100% Blast Radius Reduction** |
+| **Lateral Movement Containment Ratio (LMCR)** | Blocked Unauthorized Vectors / Total Unauthorized Vectors | **0.00%** (0/9) | **0.00%** (0/9) | **88.89% - 100%** | **+88.9% - +100%** |
+| **Data-Store Isolation Score (DSIS)** | Protected Persistence Tiers / Total Persistence Tiers | **0.00%** (0/5) | **0.00%** (0/5) | **100.00%** (5/5) | **+100.0%** |
+| **Blast Radius (Accessible DBs from Front-End)** | Count of directly queryable data stores | 5 / 5 Databases | 5 / 5 Databases | **0 / 5 Databases** | **100% Blast Radius Reduction** |
 | **Legitimate Workflow Availability** | Percentage of operational user journeys functional | 100% | 100% | **100%** | **0% Service Interruption** |

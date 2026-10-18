@@ -58,7 +58,7 @@ The attacker possesses the following concrete operational capabilities:
 2. **Network Access:** Ability to open arbitrary TCP/UDP sockets, execute HTTP requests via `curl`, `wget`, or Python scripts, and scan internal cluster IP ranges (`10.96.0.0/12` / `10.244.0.0/16`).
 3. **Identity Material:** 
    - Access to the local Kubernetes ServiceAccount token (`/var/run/secrets/kubernetes.io/serviceaccount/token`).
-   - In service mesh modes ($C_1, C_2$), outbound traffic emitted by the attacker container is transparently routed through the local Envoy sidecar proxy, which automatically injects the pod's valid SPIFFE X.509 certificate into mTLS handshakes.
+    - In service mesh modes (C1, C2), outbound traffic emitted by the attacker container is transparently routed through the local Envoy sidecar proxy, which automatically injects the pod's valid SPIFFE X.509 certificate into mTLS handshakes.
 4. **Knowledge:** Complete knowledge of public DNS names within the cluster (e.g., `orders.sock-shop.svc.cluster.local`, `orders-db.sock-shop.svc.cluster.local`).
 
 ### 2.3 Non-Capabilities (Out of Scope)
@@ -76,7 +76,7 @@ The attacker does **not** possess:
 | :--- | :--- | :--- | :--- | :--- |
 | **AV-01** | Legitimate Catalog Query | `catalogue:80` (`/catalogue`) | **Legitimate Path** | Normal user browsing (control test). |
 | **AV-02** | Legitimate Cart Operation | `carts:80` (`/carts`) | **Legitimate Path** | Normal user shopping journey (control test). |
-| **AV-03** | Lateral Pivot to Orders | `orders:80` (`/orders`) | **Unauthorized** (Only frontend $\rightarrow$ orders via user session; direct orders API should not be exposed). | Enumerate all customer orders, cancel orders, or manipulate prices. |
+| **AV-03** | Lateral Pivot to Orders | `orders:80` (`/orders`) | **Unauthorized** (Only frontend → orders via user session; direct orders API should not be exposed). | Enumerate all customer orders, cancel orders, or manipulate prices. |
 | **AV-04** | Direct Payment Submission | `payment:80` (`/paymentAuth`) | **Unauthorized** (Payment must ONLY be called by `orders`). | Authorize fraudulent credit card payments bypassing order validation. |
 | **AV-05** | Direct Shipping Trigger | `shipping:80` (`/shipping`) | **Unauthorized** (Shipping must ONLY be called by `orders`). | Dispatch orders without payment verification. |
 | **AV-06** | Direct Orders-DB Extraction | `orders-db:27017` (MongoDB) | **Unauthorized** (DB must ONLY be accessed by `orders` pod). | Dump raw customer credit cards, addresses, and purchase history. |
@@ -116,19 +116,19 @@ The attacker does **not** possess:
 
 ### 4.1 Boundary Analysis Across Configurations
 
-1. **Baseline ($C_0$):**
+1. **Baseline (C0):**
    - No mutual authentication.
    - East-west traffic is completely flat and unencrypted.
    - Any pod can reach any IP and port in the cluster.
    - **Expected Result:** Attacker successfully executes AV-01 through AV-11 (100% lateral reachability).
 
-2. **STRICT mTLS ($C_1$):**
+2. **STRICT mTLS (C1):**
    - Mutual TLS enforced between all pods via Envoy sidecars.
    - Traffic is encrypted and workloads authenticate via Citadel-issued X.509 certs.
-   - **Crucial Security Finding:** Because the attacker has compromised `front-end`, their outbound requests are routed through the `front-end` Envoy proxy. The proxy attaches the legitimate `front-end` SPIFFE certificate. **Because $C_1$ lacks authorization rules, the target proxies accept the connection!**
+   - **Crucial Security Finding:** Because the attacker has compromised `front-end`, their outbound requests are routed through the `front-end` Envoy proxy. The proxy attaches the legitimate `front-end` SPIFFE certificate. **Because C1 lacks authorization rules, the target proxies accept the connection!**
    - **Expected Result:** Attacker still successfully connects to internal services and databases (0% reduction in lateral reachability).
 
-3. **Layered Zero Trust ($C_2$):**
+3. **Layered Zero Trust (C2):**
    - STRICT mTLS authenticates the caller identity.
    - L7 `AuthorizationPolicy` blocks `front-end` from calling `payment`, `shipping`, and direct database endpoints (returns `HTTP 403 Forbidden`).
    - L3/L4 `NetworkPolicy` drops unauthorized TCP packets at the kernel level for database ports.
@@ -138,7 +138,7 @@ The attacker does **not** possess:
 
 ## 5. STRIDE Threat Categorization
 
-| STRIDE Category | Threat Description in Microservices | Baseline Mitigation ($C_0$) | mTLS Mitigation ($C_1$) | Layered ZTA Mitigation ($C_2$) |
+| STRIDE Category | Threat Description in Microservices | Baseline Mitigation (C0) | mTLS Mitigation (C1) | Layered ZTA Mitigation (C2) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Spoofing** | Attacker impersonates legitimate service (e.g. spoofing IP to call payment). | ❌ None (IP easily spoofed in flat network). | ✅ Cryptographic SPIFFE X.509 client certificate verification. | ✅ Cryptographic SPIFFE verification + strict SA binding. |
 | **Tampering** | Man-in-the-middle packet modification on cluster bridge. | ❌ Cleartext HTTP/TCP on wire. | ✅ TLS 1.3 wire encryption with authenticated cipher suites. | ✅ TLS 1.3 wire encryption + L7 policy validation. |
@@ -151,11 +151,12 @@ The attacker does **not** possess:
 
 ## 6. MITRE ATT&CK for Containers Mapping
 
-| MITRE Tactic | Technique ID | Technique Name | Exploitation in $C_0$ / $C_1$ | Mitigation in $C_2$ (Zero Trust) |
+| MITRE Tactic | Technique ID | Technique Name | Exploitation in C0 / C1 | Mitigation in C2 (Zero Trust) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Initial Access** | T1190 | Exploit Public-Facing Application | RCE / SSRF in Front-End container. | Pod isolated in DMZ; blast radius confined. |
 | **Execution** | T1059.004 | Unix Shell Execution | Attacker spawns shell in Front-End. | Least-privilege container security context + read-only rootfs. |
 | **Discovery** | T1046 | Network Service Discovery | Scanning cluster CIDRs reveals open DB ports (3306, 27017). | NetworkPolicy drops unauthorized port scan packets silently. |
 | **Lateral Movement** | T1021.002 | SMB/Remote Services (Internal APIs) | Attacker invokes `/paymentAuth` and `/orders` directly. | Istio `AuthorizationPolicy` returns `403 Access Denied`. |
 | **Exfiltration** | T1530 | Data from Cloud Storage / DB | `mongo --host orders-db` dumps all customer credit cards. | NetworkPolicy drops TCP 27017 traffic from frontend to orders-db. |
+
 | **Defense Evasion** | T1562.001 | Impair Defenses (Bypass Ingress) | Attacker bypasses edge WAF by pivoting internally. | Every internal hop acts as an independent Policy Enforcement Point. |

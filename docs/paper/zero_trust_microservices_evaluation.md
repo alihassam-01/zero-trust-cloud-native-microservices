@@ -12,9 +12,12 @@
 
 Cloud-native microservice architectures have largely superseded monolithic systems, delivering unprecedented operational velocity, elasticity, and horizontal scalability. However, their highly distributed topologies and multi-tenant container orchestration platforms expand the organizational attack surface. Traditional perimeter-based security ("castle-and-moat") assumes that actors within the private network boundary are implicitly trusted, creating critical vulnerabilities where a single compromised edge pod enables unchecked lateral movement, credential theft, and database exfiltration. While Zero Trust Architecture (ZTA)—operationalized through service meshes and Kubernetes network policies—has emerged as the recommended defense paradigm (NIST SP 800-207), empirical literature lacks rigorous quantification of its containment efficacy relative to its performance and resource overheads.
 
-In this paper, we present an empirical evaluation of Zero Trust Architecture implemented on a multi-tier cloud-native benchmark application (Sock Shop, comprising 14 discrete microservices and databases) deployed on Kubernetes and Istio. We formalize two quantitative security metrics—the **Lateral Movement Containment Ratio ($LMCR$)** and the **Data Store Isolation Score ($DSIS$)**—and evaluate them across three progressive security configurations under an assumed-breach attacker model: (1) baseline perimeter defense ($C_0$), (2) STRICT mutual TLS ($C_1$), and (3) layered Zero Trust integrating Layer 7 authorization policies and Layer 3/4 network micro-segmentation ($C_2$). 
+In this paper, we present an empirical evaluation of Zero Trust Architecture implemented on a multi-tier cloud-native benchmark application (Sock Shop, comprising 14 discrete microservices and databases) deployed on Kubernetes and Istio. We formalize two quantitative security metrics—the **Lateral Movement Containment Ratio (LMCR)** and the **Data Store Isolation Score (DSIS)**—and evaluate them across three progressive security configurations under an assumed-breach attacker model: 
+1. **C0 (Baseline Perimeter):** Default Kubernetes flat network without service mesh.
+2. **C1 (STRICT mTLS):** Mutual TLS 1.3 cryptographic termination and SPIFFE identity validation without Layer 7 authorization rules.
+3. **C2 (Layered Zero Trust):** STRICT mTLS integrated with granular Layer 7 authorization policies and Layer 3/4 network micro-segmentation.
 
-Our empirical penetration testing demonstrates a critical vulnerability in common industry deployments: **STRICT mTLS ($C_1$) yields an $LMCR$ and $DSIS$ of exactly 0.00%**, providing an identical lateral movement attack surface to an unencrypted perimeter network due to implicit cryptographic trust delegation within the service mesh. In contrast, layered Zero Trust ($C_2$) achieves an $LMCR$ of **88.9%** (containment across all unauthorized lateral paths) and a $DSIS$ of **100.00%** (complete prevention of database exfiltration). Furthermore, extensive performance benchmarking across concurrency levels ($N \in [1, 50]$) reveals that transitioning from $C_1$ to $C_2$ incurs no statistically significant latency penalty ($p = 0.428$ via two-tailed paired t-test) and requires negligible CPU/memory overhead beyond the baseline cost of Envoy proxy injection ($\approx 34.2\text{ MiB}$ per pod). We synthesize these findings into an architectural decision framework and introduce a traffic-informed least-privilege policy synthesizer to automate zero trust enforcement in enterprise clusters.
+Our empirical penetration testing demonstrates a critical vulnerability in common industry deployments: **STRICT mTLS (C1) yields an LMCR and DSIS of exactly 0.00%**, providing an identical lateral movement attack surface to an unencrypted perimeter network due to implicit cryptographic trust delegation within the service mesh. In contrast, layered Zero Trust (C2) achieves an LMCR of **88.89%** (containment across all unauthorized lateral paths) and a DSIS of **100.00%** (complete prevention of database exfiltration). Furthermore, extensive performance benchmarking across concurrency levels (N ∈ [1, 50]) reveals that transitioning from C1 to C2 incurs no statistically significant latency penalty (*p* = 0.428 via two-tailed paired t-test) and requires negligible CPU/memory overhead beyond the baseline cost of Envoy proxy injection (~34.2 MiB per pod). We synthesize these findings into an architectural decision framework and introduce a traffic-informed least-privilege policy synthesizer to automate zero trust enforcement in enterprise clusters.
 
 **Keywords:** Zero Trust Architecture, Cloud-Native Security, Service Mesh, Istio, Envoy Proxy, Microservices, Lateral Movement, Performance Benchmarking, Mutual TLS.
 
@@ -28,7 +31,7 @@ Modern enterprise software systems are predominantly engineered as distributed m
 While microservices provide substantial improvements in deployment agility, fault isolation, and developer productivity, they fundamentally transform the threat landscape. Under classical perimeter security models, defenses are concentrated at the ingress boundary (e.g., edge firewalls, web application firewalls, and API gateways). Traffic originating from within the internal cluster boundary is granted broad, implicit trust. Consequently, if an adversary succeeds in compromising a publicly exposed frontend workload—via remote code execution (RCE), command injection, or deserialization vulnerabilities—the internal cluster becomes an unsegmented, flat network. The attacker can enumerate services, traverse service graphs, hijack ambient authentication credentials, and exfiltrate sensitive data from backend data stores with minimal friction.
 
 ### 1.2 The Promise and Realities of Zero Trust
-To counter the failure of perimeter security, the National Institute of Standards and Technology (NIST) formalized the Zero Trust Architecture (ZTA) framework in **NIST SP 800-207** \cite{nist800207} and **NIST SP 800-207A** \cite{nist800207a}. Founded on the core tenet of *"never trust, always verify"*, ZTA mandates:
+To counter the failure of perimeter security, the National Institute of Standards and Technology (NIST) formalized the Zero Trust Architecture (ZTA) framework in **NIST SP 800-207** [[1]](#references) and **NIST SP 800-207A** [[2]](#references). Founded on the core tenet of *"never trust, always verify"*, ZTA mandates:
 1. Universal authentication and encryption of all communication flows regardless of network location.
 2. Continuous, dynamic authorization adhering strictly to the principle of least privilege.
 3. Micro-segmentation of workloads to prevent unauthorized lateral movement.
@@ -43,20 +46,20 @@ Despite widespread enterprise adoption, two critical research gaps persist in th
 ### 1.4 Research Questions and Hypotheses
 This study investigates three primary research questions:
 
-- **RQ1 (Security Efficacy):** To what extent does transitioning from an unsegmented perimeter ($C_0$) to STRICT mTLS ($C_1$) and layered Zero Trust ($C_2$) reduce an attacker's lateral movement reach and data exfiltration capability following the compromise of an edge microservice?
-  - *Hypothesis $H_{1a}$:* $C_1$ will not significantly reduce lateral movement compared to $C_0$ because internal service identities are treated symmetrically by default sidecar listeners.
-  - *Hypothesis $H_{1b}$:* $C_2$ will constrain lateral movement by $\ge 75\%$ and eliminate direct database exfiltration ($DSIS = 100\%$).
-- **RQ2 (Performance Trade-offs):** What are the empirical latency, throughput, and compute/memory penalties incurred by introducing service mesh sidecars ($C_1$) and evaluating granular L7 authorization tables ($C_2$) under varying concurrency loads?
-  - *Hypothesis $H_{2a}$:* Tail latency ($p_{99}$) will increase by no more than 20% between $C_0$ and $C_2$ under moderate concurrency ($N \le 25$).
-  - *Hypothesis $H_{2b}$:* Layered L7 authorization policies ($C_2$) will incur negligible incremental latency relative to mTLS alone ($C_1$).
-  - *Hypothesis $H_{2c}$:* Envoy proxy memory overhead will scale linearly with pod density ($\approx 30\text{--}40\text{ MiB}$ per pod).
+- **RQ1 (Security Efficacy):** To what extent does transitioning from an unsegmented perimeter (C0) to STRICT mTLS (C1) and layered Zero Trust (C2) reduce an attacker's lateral movement reach and data exfiltration capability following the compromise of an edge microservice?
+  - **Hypothesis H1a:** C1 will not significantly reduce lateral movement compared to C0 because internal service identities are treated symmetrically by default sidecar listeners.
+  - **Hypothesis H1b:** C2 will constrain lateral movement by ≥ 75% and eliminate direct database exfiltration (DSIS = 100%).
+- **RQ2 (Performance Trade-offs):** What are the empirical latency, throughput, and compute/memory penalties incurred by introducing service mesh sidecars (C1) and evaluating granular L7 authorization tables (C2) under varying concurrency loads?
+  - **Hypothesis H2a:** Tail latency (p99) will increase by no more than 20% between C0 and C2 under moderate concurrency (N ≤ 25).
+  - **Hypothesis H2b:** Layered L7 authorization policies (C2) will incur negligible incremental latency relative to mTLS alone (C1).
+  - **Hypothesis H2c:** Envoy proxy memory overhead will scale linearly with pod density (~30–40 MiB per pod).
 - **RQ3 (Operational Automation):** How can least-privilege Zero Trust policies be synthesized automatically from observed workload communication graphs to eliminate configuration error and operational friction?
 
 ### 1.5 Contributions
 This paper makes the following contributions:
-1. **Formal Empirical Security Metrics:** We define the *Lateral Movement Containment Ratio ($LMCR$)* and *Data Store Isolation Score ($DSIS$)* to formally quantify zero trust containment.
-2. **Empirical Demonstration of the "mTLS Illusion":** We prove through reproducible penetration testing that STRICT mTLS achieves an $LMCR$ and $DSIS$ of 0.00%, offering no defense against internal lateral movement without accompanying Layer 7 authorization.
-3. **Multi-Tier Performance Characterization:** We conduct load testing across concurrency levels ($N \in \{1, 5, 10, 25, 50\}$) measuring $p_{50}, p_{90}, p_{95}, p_{99}$ latency, throughput, and sidecar resource overhead, backed by statistical hypothesis testing ($p = 0.428$).
+1. **Formal Empirical Security Metrics:** We define the *Lateral Movement Containment Ratio (LMCR)* and *Data Store Isolation Score (DSIS)* to formally quantify zero trust containment.
+2. **Empirical Demonstration of the "mTLS Illusion":** We prove through reproducible penetration testing that STRICT mTLS achieves an LMCR and DSIS of 0.00%, offering no defense against internal lateral movement without accompanying Layer 7 authorization.
+3. **Multi-Tier Performance Characterization:** We conduct load testing across concurrency levels (N ∈ {1, 5, 10, 25, 50}) measuring p50, p90, p95, and p99 latency, throughput, and sidecar resource overhead, backed by statistical hypothesis testing (*p* = 0.428).
 4. **Architectural Decision Framework:** We provide actionable sizing formulas, trade-off matrices, and production guidelines for cloud architects.
 5. **Open-Source Artifacts & Extension Engine:** We open-source our complete experimental testbed, penetration suite, benchmark automation, and an automated policy synthesizer that extracts least-privilege configurations from traffic telemetry.
 
@@ -65,7 +68,7 @@ This paper makes the following contributions:
 ## 2. Background and Related Work
 
 ### 2.1 Zero Trust Frameworks and Standards
-The architectural principles of Zero Trust originate from the Jericho Forum (2004) and were refined by Kindervag \cite{kindervag2010}. NIST formalized the framework in **SP 800-207** \cite{nist800207}, establishing the Policy Engine (PE), Policy Administrator (PA), and Policy Enforcement Point (PEP) model. NIST **SP 800-207A** \cite{nist800207a} and **SP 800-204A/B** \cite{nist800204a, nist800204b} specifically address cloud-native applications and service mesh architectures, recommending mutual TLS for cryptographic workload identity and micro-segmentation for lateral movement mitigation.
+The architectural principles of Zero Trust originate from the Jericho Forum (2004) and were refined by Kindervag [[5]](#references). NIST formalized the framework in **SP 800-207** [[1]](#references), establishing the Policy Engine (PE), Policy Administrator (PA), and Policy Enforcement Point (PEP) model. NIST **SP 800-207A** [[2]](#references) and **SP 800-204A/B** [[3]](#references), [[4]](#references) specifically address cloud-native applications and service mesh architectures, recommending mutual TLS for cryptographic workload identity and micro-segmentation for lateral movement mitigation.
 
 ### 2.2 Service Mesh Architecture and Identity
 In Kubernetes, service meshes decouple operational concerns (traffic management, observability, security) from application business logic. The architecture consists of:
@@ -74,9 +77,9 @@ In Kubernetes, service meshes decouple operational concerns (traffic management,
 
 ### 2.3 Prior Empirical Studies and Literature Gaps
 Prior academic literature has explored aspects of service mesh performance and microservice security:
-- **Li et al. (2022)** \cite{li2022} evaluated the overhead of Istio and Linkerd on basic microservices, reporting that service meshes can introduce up to 40% latency inflation under sequential loads. However, their work did not evaluate security containment or adversarial lateral movement.
-- **Staffolani et al. (2023)** \cite{staffolani2023} benchmarked CPU and memory overheads of Istio and Cilium, observing that proxy-based meshes exhibit higher memory footprints than eBPF-based approaches. However, their study lacked application-level penetration testing and did not isolate the incremental cost of L7 authorization policies.
-- **Nieto et al. (2021)** \cite{nieto2021} developed threat models for microservices, highlighting the danger of flat network topologies, but provided no empirical attack validation or reproducible benchmark metrics.
+- **Li et al. (2022)** [[6]](#references) evaluated the overhead of Istio and Linkerd on basic microservices, reporting that service meshes can introduce up to 40% latency inflation under sequential loads. However, their work did not evaluate security containment or adversarial lateral movement.
+- **Staffolani et al. (2023)** [[7]](#references) benchmarked CPU and memory overheads of Istio and Cilium, observing that proxy-based meshes exhibit higher memory footprints than eBPF-based approaches. However, their study lacked application-level penetration testing and did not isolate the incremental cost of L7 authorization policies.
+- **Nieto et al. (2021)** [[8]](#references) developed threat models for microservices, highlighting the danger of flat network topologies, but provided no empirical attack validation or reproducible benchmark metrics.
 
 Our study bridges these disparate domains by conducting unified, synchronized experiments measuring both security efficacy and performance trade-offs on an identical 14-service application testbed.
 
@@ -89,7 +92,7 @@ In compliance with NIST SP 800-207 and the MITRE ATT&CK for Containers matrix, w
 
 ```
                     +------------------------------------+
-                    |        UNTRUSTED EXTERNAL INTERNET  |
+                    |        UNTRUSTED EXTERNAL INTERNET |
                     +------------------------------------+
                                       |
                            Public Ingress / NodePort
@@ -120,21 +123,27 @@ In compliance with NIST SP 800-207 and the MITRE ATT&CK for Containers matrix, w
   2. The adversary cannot modify Kubernetes API server objects or alter Istio control plane certificates directly.
 
 ### 3.3 Formal Security Metrics
-To rigorously evaluate defensive containment, we formalize two metrics:
+To rigorously evaluate defensive containment, we formalize two quantitative metrics:
 
-#### 3.3.1 Lateral Movement Containment Ratio ($LMCR$)
-Let $\mathcal{A}_{\text{lateral}}$ denote the set of all unauthorized lateral access attempts from the compromised pod to downstream application services. Let $\mathcal{B}_{\text{lateral}} \subseteq \mathcal{A}_{\text{lateral}}$ denote the subset of attempts successfully intercepted and blocked by the defensive architecture:
+#### 3.3.1 Lateral Movement Containment Ratio (LMCR)
+Let **A_lateral** denote the set of all *M* tested unauthorized lateral access attempts from the compromised pod to downstream application services. Let **B_lateral** denote the subset of attempts successfully intercepted and blocked by the defensive architecture:
 
-$$LMCR = \frac{|\mathcal{B}_{\text{lateral}}|}{|\mathcal{A}_{\text{lateral}}|} = \frac{\sum_{i=1}^{M} \mathbb{I}(\text{Blocked}(a_i))}{M} \times 100\%$$
+```
+LMCR = (Number of Blocked Unauthorized Vectors / Total Unauthorized Vectors) × 100%
+     = (∑ Blocked(a_i) / M) × 100%
+```
 
-Where $\mathbb{I}(\cdot)$ is the indicator function evaluating to 1 if the access attempt was blocked (HTTP 403, TCP reset, or network drop) and 0 if access was granted (HTTP 200, TCP established). An ideal Zero Trust system achieves $LMCR = 100\%$.
+Where `Blocked(a_i) = 1` if the access attempt was blocked (HTTP 403 Forbidden, TCP reset, or network drop) and `0` if access was granted (HTTP 200 OK, TCP established). An ideal Zero Trust system achieves **LMCR = 100%**.
 
-#### 3.3.2 Data Store Isolation Score ($DSIS$)
-Let $\mathcal{D}$ denote the set of backend persistence data stores (e.g., MongoDB, MySQL, Redis, RabbitMQ) that must never be directly accessible from the edge tier. Let $\mathcal{B}_{\text{data}} \subseteq \mathcal{D}$ denote the data stores to which direct connections from the edge pod are successfully blocked:
+#### 3.3.2 Data Store Isolation Score (DSIS)
+Let **D** denote the set of *K* backend persistence data stores (e.g., MongoDB, MySQL, Redis, RabbitMQ) that must never be directly accessible from the edge tier. Let **B_data** denote the data stores to which direct connections from the edge pod are successfully blocked:
 
-$$DSIS = \frac{|\mathcal{B}_{\text{data}}|}{|\mathcal{D}|} = \frac{\sum_{j=1}^{K} \mathbb{I}(\text{ConnectionBlocked}(d_j))}{K} \times 100\%$$
+```
+DSIS = (Number of Protected Persistence Tiers / Total Persistence Tiers) × 100%
+     = (∑ ConnectionBlocked(d_j) / K) × 100%
+```
 
-In a flat network, $DSIS = 0\%$, indicating catastrophic exposure of the persistence layer. Under robust Zero Trust, $DSIS = 100\%$.
+In a flat network, **DSIS = 0%**, indicating complete exposure of the persistence layer. Under robust Zero Trust, **DSIS = 100%**.
 
 ---
 
@@ -184,9 +193,9 @@ Configuration Comparison
 +-----------------------------------------------------------------------------+
 ```
 
-1. **$C_0$ (Baseline Perimeter):** Standard Kubernetes networking without Istio sidecars. Pod-to-pod communication occurs in cleartext over the overlay network (`flannel`/`kubenet`). Default allow-all routing.
-2. **$C_1$ (STRICT mTLS):** Istio sidecars injected into all pods. A cluster-wide `PeerAuthentication` resource enforces `STRICT` mode (TLS 1.3 with ECDHE key exchange). Every pod is assigned an X.509 SVID issued by `istiod`. No `AuthorizationPolicy` rules are applied (implicit allow-all within the mesh).
-3. **$C_2$ (Layered Zero Trust):** STRICT mTLS active. In addition:
+1. **C0 (Baseline Perimeter):** Standard Kubernetes networking without Istio sidecars. Pod-to-pod communication occurs in cleartext over the overlay network (`flannel`/`kubenet`). Default allow-all routing.
+2. **C1 (STRICT mTLS):** Istio sidecars injected into all pods. A cluster-wide `PeerAuthentication` resource enforces `STRICT` mode (TLS 1.3 with ECDHE key exchange). Every pod is assigned an X.509 SVID issued by `istiod`. No `AuthorizationPolicy` rules are applied (implicit allow-all within the mesh).
+3. **C2 (Layered Zero Trust):** STRICT mTLS active. In addition:
    - A default-deny `AuthorizationPolicy` blocks all inter-service traffic.
    - Explicit, least-privilege L7 rules permit only validated communication paths (matching source `principal`, HTTP `methods`, and URL `paths`).
    - Kubernetes `NetworkPolicy` objects enforce Layer 3/4 packet-level isolation, preventing unauthorized egress and blocking non-whitelisted TCP ports.
@@ -208,10 +217,10 @@ To ensure absolute reproducibility, we developed `04_run_security_suite.py`, an 
 Each probe measures the HTTP response status code, TCP connection state, latency, and socket termination reason.
 
 ### 4.5 Performance Load Testing Framework
-We developed `05_run_performance_benchmark.py`, a multi-threaded load-testing engine executing against the application's primary multi-tier transaction path (`GET /catalogue`). Tests were conducted across five concurrency levels ($N \in \{1, 5, 10, 25, 50\}$) with 200 requests per tier following a 20-request warmup period. Metrics captured include:
+We developed `05_run_performance_benchmark.py`, a multi-threaded load-testing engine executing against the application's primary multi-tier transaction path (`GET /catalogue`). Tests were conducted across five concurrency levels (N ∈ {1, 5, 10, 25, 50}) with 200 requests per tier following a 20-request warmup period. Metrics captured include:
 - Throughput (Requests Per Second, RPS).
-- Latency percentiles: $p_{50}$ (median), $p_{90}$, $p_{95}$, and $p_{99}$ (tail latency).
-- Mean latency ($\bar{x}$) and sample standard deviation ($\sigma$).
+- Latency percentiles: p50 (median), p90, p95, and p99 (tail latency).
+- Mean latency (x̄) and sample standard deviation (σ).
 - Sidecar CPU and memory consumption extracted from Kubernetes resource APIs.
 
 ---
@@ -219,11 +228,11 @@ We developed `05_run_performance_benchmark.py`, a multi-threaded load-testing en
 ## 5. Security Evaluation and Empirical Findings
 
 ### 5.1 Penetration Testing Results
-Table 1 summarizes the empirical outcomes across all 14 attack vectors under configurations $C_0, C_1,$ and $C_2$.
+Table 1 summarizes the empirical outcomes across all 14 attack vectors under configurations C0, C1, and C2.
 
 **Table 1:** Empirical Attack Containment Results Across Security Configurations.
 
-| Vector # | Attack Description | Target Service & Port | $C_0$ (Baseline) | $C_1$ (STRICT mTLS) | $C_2$ (Layered ZTA) |
+| Vector # | Attack Description | Target Service & Port | C0 (Baseline) | C1 (STRICT mTLS) | C2 (Layered ZTA) |
 | :---: | :--- | :--- | :---: | :---: | :---: |
 | V1 | Authorized Catalogue Read | `catalogue:80` (GET) | ALLOWED (200) | ALLOWED (200) | ALLOWED (200) |
 | V2 | Authorized Carts Read | `carts:80` (GET) | ALLOWED (200) | ALLOWED (200) | ALLOWED (200) |
@@ -243,23 +252,27 @@ Table 1 summarizes the empirical outcomes across all 14 attack vectors under con
 ### 5.2 Quantitative Containment Metrics
 Evaluating the formal metrics defined in Section 3.3 yields:
 
-$$\begin{aligned}
-LMCR(C_0) &= \frac{0}{9} = \mathbf{0.00\%}, \quad &DSIS(C_0) &= \frac{0}{5} = \mathbf{0.00\%} \\
-LMCR(C_1) &= \frac{0}{9} = \mathbf{0.00\%}, \quad &DSIS(C_1) &= \frac{0}{5} = \mathbf{0.00\%} \\
-LMCR(C_2) &= \frac{8}{9} = \mathbf{88.89\%}, \quad &DSIS(C_2) &= \frac{5}{5} = \mathbf{100.00\%}
-\end{aligned}$$
+- **Baseline Perimeter (C0):**
+  - LMCR = 0 / 9 = **0.00%**
+  - DSIS = 0 / 5 = **0.00%**
+- **STRICT mTLS (C1):**
+  - LMCR = 0 / 9 = **0.00%**
+  - DSIS = 0 / 5 = **0.00%**
+- **Layered Zero Trust (C2):**
+  - LMCR = 8 / 9 = **88.89%**
+  - DSIS = 5 / 5 = **100.00%**
 
 ### 5.3 Analysis of the "mTLS Illusion"
-A central finding of this research is the empirical verification of Hypothesis $H_{1a}$: **STRICT mutual TLS alone provides zero protection against lateral movement.**
+A central finding of this research is the empirical verification of Hypothesis H1a: **STRICT mutual TLS alone provides zero protection against lateral movement.**
 
-Under $C_1$, Istio successfully provisions X.509 SVIDs and encrypts all network packets using TLS 1.3. When the compromised `front-end` workload dispatches an unauthorized request to `payment` or `orders-db`, the local Envoy sidecar intercepts the egress connection, wraps it in mTLS, and presents `front-end`'s valid SPIFFE identity (`spiffe://cluster.local/ns/sock-shop/sa/front-end`) to the target pod's sidecar. The receiving sidecar validates the cryptographic signature against the cluster root CA. 
+Under C1, Istio successfully provisions X.509 SVIDs and encrypts all network packets using TLS 1.3. When the compromised `front-end` workload dispatches an unauthorized request to `payment` or `orders-db`, the local Envoy sidecar intercepts the egress connection, wraps it in mTLS, and presents `front-end`'s valid SPIFFE identity (`spiffe://cluster.local/ns/sock-shop/sa/front-end`) to the target pod's sidecar. The receiving sidecar validates the cryptographic signature against the cluster root CA. 
 
 Crucially, because no Layer 7 `AuthorizationPolicy` exists to evaluate *whether* `front-end` is authorized to invoke `paymentAuth` or establish a raw TCP socket to `orders-db`, the inbound sidecar's default action is `ALLOW`. The connection is decrypted and delivered to the target application container. To an attacker who has compromised an internal workload, an mTLS-only cluster behaves identically to a flat, unencrypted network.
 
-### 5.4 RBAC Enforcement Mechanics Under $C_2$
-Under configuration $C_2$, defense-in-depth operates across two distinct layers:
-1. **Layer 7 HTTP Enforcement:** Inbound requests to `payment`, `shipping`, and other restricted services encounter Envoy's `envoy.filters.http.rbac` filter. The filter evaluates the request against active `AuthorizationPolicy` tables. Because the rule whitelist permits only `orders` to invoke `payment`, Envoy immediately rejects `front-end`'s request with an HTTP `403 Forbidden` (`RBAC: access denied`), terminating the attack in $<1\text{ ms}$ without consuming backend application cycles.
-2. **Layer 4 TCP Reset Enforcement:** When the attacker attempts direct TCP socket connections to database ports (MySQL 3306, MongoDB 27017, AMQP 5672), Envoy's `envoy.filters.network.rbac` filter intercepts the initial payload bytes. Failing principal authorization, Envoy terminates the transport session with an immediate `ECONNRESET` (Connection reset by peer). Concurrently, Kubernetes `NetworkPolicy` packet filters drop out-of-spec SYN packets at the Linux bridge layer, providing complete data store isolation ($DSIS = 100\%$).
+### 5.4 RBAC Enforcement Mechanics Under C2
+Under configuration C2, defense-in-depth operates across two distinct layers:
+1. **Layer 7 HTTP Enforcement:** Inbound requests to `payment`, `shipping`, and other restricted services encounter Envoy's `envoy.filters.http.rbac` filter. The filter evaluates the request against active `AuthorizationPolicy` tables. Because the rule whitelist permits only `orders` to invoke `payment`, Envoy immediately rejects `front-end`'s request with an HTTP `403 Forbidden` (`RBAC: access denied`), terminating the attack in < 1 ms without consuming backend application cycles.
+2. **Layer 4 TCP Reset Enforcement:** When the attacker attempts direct TCP socket connections to database ports (MySQL 3306, MongoDB 27017, AMQP 5672), Envoy's `envoy.filters.network.rbac` filter intercepts the initial payload bytes. Failing principal authorization, Envoy terminates the transport session with an immediate `ECONNRESET` (Connection reset by peer). Concurrently, Kubernetes `NetworkPolicy` packet filters drop out-of-spec SYN packets at the Linux bridge layer, providing complete data store isolation (DSIS = 100%).
 
 ---
 
@@ -268,38 +281,38 @@ Under configuration $C_2$, defense-in-depth operates across two distinct layers:
 ### 6.1 Benchmark Results and Latency Profiles
 Table 2 presents the consolidated performance measurements obtained across all security architectures and concurrency levels.
 
-**Table 2:** Empirical Performance Benchmark Results ($N = 1$ to $50$).
+**Table 2:** Empirical Performance Benchmark Results (N = 1 to 50).
 
-| Scenario | Concurrency ($N$) | Throughput (RPS) | $p_{50}$ (ms) | $p_{90}$ (ms) | $p_{95}$ (ms) | $p_{99}$ (ms) | Mean $\bar{x}$ (ms) | Std Dev $\sigma$ (ms) |
+| Scenario | Concurrency (N) | Throughput (RPS) | p50 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | Mean x̄ (ms) | Std Dev σ (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **$C_0$ (Baseline)** | 1 | 58.7 | 10.20 | 49.62 | 63.30 | 79.57 | 17.03 | 17.84 |
+| **C0 (Baseline)** | 1 | 58.7 | 10.20 | 49.62 | 63.30 | 79.57 | 17.03 | 17.84 |
 | | 5 | 62.7 | 80.56 | 191.92 | 213.27 | 300.02 | 79.74 | 69.34 |
 | | 10 | 77.5 | 121.61 | 202.85 | 209.20 | 285.61 | 129.04 | 59.95 |
 | | 25 | 110.6 | 210.73 | 385.09 | 389.46 | 395.19 | 226.04 | 116.12 |
 | | 50 | 99.3 | 566.86 | 809.25 | 875.77 | 881.72 | 503.52 | 256.32 |
-| **$C_1$ (STRICT mTLS)** | 1 | 64.4 | 9.99 | 46.01 | 52.30 | 70.73 | 15.53 | 14.92 |
+| **C1 (STRICT mTLS)** | 1 | 64.4 | 9.99 | 46.01 | 52.30 | 70.73 | 15.53 | 14.92 |
 | | 5 | 97.3 | 68.65 | 100.86 | 103.33 | 106.72 | 51.39 | 38.64 |
 | | 10 | 115.3 | 77.29 | 189.17 | 193.26 | 201.31 | 86.73 | 65.73 |
 | | 25 | 191.3 | 95.38 | 282.23 | 291.16 | 364.19 | 130.68 | 98.42 |
 | | 50 | 117.0 | 367.21 | 680.02 | 700.13 | 718.97 | 427.35 | 227.18 |
-| **$C_2$ (Layered ZTA)** | 1 | 70.3 | 9.58 | 44.49 | 52.23 | 71.55 | 14.22 | 14.01 |
+| **C2 (Layered ZTA)** | 1 | 70.3 | 9.58 | 44.49 | 52.23 | 71.55 | 14.22 | 14.01 |
 | | 5 | 83.3 | 55.01 | 120.02 | 170.96 | 224.39 | 60.02 | 53.22 |
 | | 10 | 91.7 | 100.53 | 177.97 | 199.35 | 227.36 | 109.05 | 63.81 |
 | | 25 | 107.4 | 212.56 | 387.46 | 422.62 | 424.87 | 232.77 | 125.43 |
 | | 50 | 139.9 | 311.46 | 457.97 | 489.44 | 636.18 | 357.40 | 182.29 |
 
 ### 6.2 Statistical Hypothesis Testing
-To evaluate whether the Layer 7 RBAC policies in $C_2$ introduce statistically significant latency inflation compared to mTLS alone ($C_1$), we conducted a two-tailed paired Student's t-test across all paired latency percentiles ($p_{50}, p_{90}, p_{95}, p_{99}$ across all concurrency levels):
+To evaluate whether the Layer 7 RBAC policies in C2 introduce statistically significant latency inflation compared to mTLS alone (C1), we conducted a two-tailed paired Student's t-test across all paired latency percentiles (p50, p90, p95, p99 across all concurrency levels):
 
-- **Null Hypothesis ($H_0$):** $\mu_{\text{latency}}(C_2) - \mu_{\text{latency}}(C_1) = 0$.
-- **Alternative Hypothesis ($H_1$):** $\mu_{\text{latency}}(C_2) - \mu_{\text{latency}}(C_1) \ne 0$.
+- **Null Hypothesis (H0):** Mean Latency Difference [C2 - C1] = 0.
+- **Alternative Hypothesis (H1):** Mean Latency Difference [C2 - C1] ≠ 0.
 
-The test yielded a test statistic of $t = 0.810$ and a p-value of **$p = 0.428$**. Because $p > 0.05$, we fail to reject the null hypothesis, confirming Hypothesis $H_{2b}$: **Enforcing Layer 7 Zero Trust authorization policies incurs no statistically significant latency penalty over baseline mutual TLS.**
+The test yielded a test statistic of *t* = 0.810 and a p-value of ***p* = 0.428**. Because *p* > 0.05, we fail to reject the null hypothesis, confirming Hypothesis H2b: **Enforcing Layer 7 Zero Trust authorization policies incurs no statistically significant latency penalty over baseline mutual TLS.**
 
 ### 6.3 Tail Latency Dynamics Under High Concurrency
-A surprising empirical finding occurs at peak concurrency ($N = 50$): configuration $C_2$ demonstrates a **27.8% lower tail latency ($p_{99} = 636.18\text{ ms}$)** compared to the unmanaged baseline $C_0$ ($p_{99} = 881.72\text{ ms}$).
+A surprising empirical finding occurs at peak concurrency (N = 50): configuration C2 demonstrates a **27.8% lower tail latency (p99 = 636.18 ms)** compared to the unmanaged baseline C0 (p99 = 881.72 ms).
 
-This phenomenon is explained by Envoy's architectural role as an intelligent Layer 7 proxy. In $C_0$, raw concurrent HTTP requests directly bombard application container threads, causing connection queue saturation, TCP buffer bloat, and socket starvation in the backend Node.js and Go runtimes. In $C_1$ and $C_2$, Envoy maintains persistent, pre-established HTTP/2 multiplexed connection pools. Envoy absorbs incoming connection bursts, queues requests efficiently in user space, and forwards them across established connections, mitigating backend thread churn and stabilizing tail latency under load.
+This phenomenon is explained by Envoy's architectural role as an intelligent Layer 7 proxy. In C0, raw concurrent HTTP requests directly bombard application container threads, causing connection queue saturation, TCP buffer bloat, and socket starvation in the backend Node.js and Go runtimes. In C1 and C2, Envoy maintains persistent, pre-established HTTP/2 multiplexed connection pools. Envoy absorbs incoming connection bursts, queues requests efficiently in user space, and forwards them across established connections, mitigating backend thread churn and stabilizing tail latency under load.
 
 ### 6.4 Resource Footprint and Scaling Cost Function
 Sidecar proxy overhead was monitored across all 14 application pods under both idle and peak benchmark loads:
@@ -313,11 +326,13 @@ Sidecar proxy overhead was monitored across all 14 application pods under both i
 | CPU Load (Idle) | 83 m | 46 m | 35.6% |
 | CPU Load (Active Benchmark) | 138 m | 125 m | 47.5% |
 
-The empirical memory consumption per Envoy sidecar averaged $\bar{m}_{\text{proxy}} = 34.2\text{ MiB}$ ($\sigma = 3.8\text{ MiB}$). The total cluster memory overhead scales linearly as a function of the number of workload pods $N_{\text{pods}}$:
+The empirical memory consumption per Envoy sidecar averaged **34.2 MiB** (σ = 3.8 MiB). The total cluster memory overhead scales linearly as a function of the number of workload pods (N_pods):
 
-$$\text{Overhead}_{\text{memory}}(N_{\text{pods}}) = 34.2\text{ MiB} \times N_{\text{pods}} + \mathcal{O}(1)_{\text{control\_plane}}$$
+```
+Overhead_memory(N_pods) ≈ (34.2 MiB × N_pods) + Control_Plane_Base
+```
 
-For a representative 100-pod enterprise cluster, the full data plane memory footprint is approximately **3.42 GiB**, representing $<3.5\%$ of a modest 96 GiB multi-node worker pool.
+For a representative 100-pod enterprise cluster, the full data plane memory footprint is approximately **3.42 GiB**, representing < 3.5% of a modest 96 GiB multi-node worker pool.
 
 ---
 
@@ -328,21 +343,21 @@ Table 4 synthesizes our empirical findings into an architectural decision matrix
 
 **Table 4:** Unified Security vs. Performance Trade-off Matrix.
 
-| Dimension | $C_0$ (Baseline) | $C_1$ (STRICT mTLS) | $C_2$ (Layered ZTA) |
+| Dimension | C0 (Baseline) | C1 (STRICT mTLS) | C2 (Layered ZTA) |
 | :--- | :---: | :---: | :---: |
-| **Lateral Movement Containment ($LMCR$)** | 0.00% | 0.00% | **88.89%** |
-| **Data Store Isolation ($DSIS$)** | 0.00% | 0.00% | **100.00%** |
+| **Lateral Movement Containment (LMCR)** | 0.00% | 0.00% | **88.89%** |
+| **Data Store Isolation (DSIS)** | 0.00% | 0.00% | **100.00%** |
 | **Wire Eavesdropping Protection** | ❌ None | ✅ TLS 1.3 | ✅ TLS 1.3 |
 | **Cryptographic Workload Identity** | ❌ None | ✅ SPIFFE SVID | ✅ SPIFFE SVID |
 | **Memory Cost per Pod** | **0 MiB** | ~34.2 MiB | ~34.2 MiB |
 | **Compute Overhead per Pod (Active)**| **0 m** | ~8.9 m | ~8.9 m |
-| **Tail Latency Impact ($p_{99}$ at $N=50$)**| Baseline (881 ms) | -18.5% (718 ms) | **-27.8% (636 ms)** |
+| **Tail Latency Impact (p99 at N=50)**| Baseline (881 ms) | -18.5% (718 ms) | **-27.8% (636 ms)** |
 | **Architectural Assessment** | High Vulnerability | Inefficient / Incomplete | **Optimal Security/Cost** |
 
 ### 7.2 The Architectural Imperative: "Don't Stop at mTLS"
 Our empirical data demonstrates a clear economic and security imperative for systems architects: **Deploying a service mesh for mTLS alone is an architectural anti-pattern.** 
 
-The primary compute and memory costs of a service mesh—sidecar process memory, CPU context switches, packet redirection via iptables, and TLS cryptographic handshakes—are fully incurred upon transitioning from $C_0$ to $C_1$. However, $C_1$ delivers 0% containment against an internal attacker. Adding Layer 7 `AuthorizationPolicy` rules and Layer 3/4 `NetworkPolicy` objects ($C_2$) requires no additional memory, introduces no measurable CPU penalty, and yields an immediate leap to 88.9% lateral containment and 100% data store isolation. Architects paying the "mesh tax" must enforce Layer 7 policies to realize the security benefits.
+The primary compute and memory costs of a service mesh—sidecar process memory, CPU context switches, packet redirection via iptables, and TLS cryptographic handshakes—are fully incurred upon transitioning from C0 to C1. However, C1 delivers 0% containment against an internal attacker. Adding Layer 7 `AuthorizationPolicy` rules and Layer 3/4 `NetworkPolicy` objects (C2) requires no additional memory, introduces no measurable CPU penalty, and yields an immediate leap to 88.89% lateral containment and 100% data store isolation. Architects paying the "mesh tax" must enforce Layer 7 policies to realize the security benefits.
 
 ### 7.3 Guidelines for Production Zero Trust Deployment
 1. **Enforce Default-Deny Early:** Establish a cluster-wide `AuthorizationPolicy` with an empty rule set (`action: ALLOW`, no rules) in production namespaces to default all traffic to deny.
@@ -355,10 +370,10 @@ The primary compute and memory costs of a service mesh—sidecar process memory,
 ## 8. Research Extension: Automated Traffic-Informed Policy Synthesis
 
 ### 8.1 The Operational Policy Bottleneck
-While $C_2$ provides superior security containment, manual authoring and maintenance of granular Layer 7 authorization policies represents a notorious operational bottleneck. In microservice architectures with dozens of interacting services, manual policy specification is highly error-prone, frequently resulting in false-positive outages or overly permissive wildcard rules.
+While C2 provides superior security containment, manual authoring and maintenance of granular Layer 7 authorization policies represents a notorious operational bottleneck. In microservice architectures with dozens of interacting services, manual policy specification is highly error-prone, frequently resulting in false-positive outages or overly permissive wildcard rules.
 
 ### 8.2 Architectural Design of the Policy Synthesizer
-To resolve this challenge, we developed an independent research extension located in `extension-policy-generator/`:
+To resolve this challenge, we developed an independent research extension located in [`extension-policy-generator/`](../../extension-policy-generator/):
 
 ```
                        TRAFFIC-INFORMED POLICY ENGINE
@@ -375,8 +390,8 @@ To resolve this challenge, we developed an independent research extension locate
                                                          +----------------------+
 ```
 
-1. **Telemetry Ingestion (`traffic_analyzer.py`):** Ingests structured JSON access logs emitted by Envoy sidecars or distributed tracing spans. Extracts source principal ($S$), destination service ($D$), HTTP method ($M$), request path ($P$), and destination port.
-2. **Directed Graph Modeling:** Constructs a canonical directed communication multigraph $G = (V, E)$, pruning redundant probes and clustering parameterized RESTful paths (e.g., `/catalogue/{id}`).
+1. **Telemetry Ingestion (`traffic_analyzer.py`):** Ingests structured JSON access logs emitted by Envoy sidecars or distributed tracing spans. Extracts source principal (*S*), destination service (*D*), HTTP method (*M*), request path (*P*), and destination port.
+2. **Directed Graph Modeling:** Constructs a canonical directed communication multigraph *G = (V, E)*, pruning redundant probes and clustering parameterized RESTful paths (e.g., `/catalogue/{id}`).
 3. **Policy Synthesizer (`policy_synthesizer.py`):** Formulates least-privilege declarative YAML specifications:
    - Istio `AuthorizationPolicy` manifests specifying exact principal bindings (`source.principals`) and operation constraints (`methods`, `paths`).
    - Kubernetes `NetworkPolicy` manifests restricting egress IP blocks and destination ports.
@@ -387,7 +402,7 @@ To resolve this challenge, we developed an independent research extension locate
 ## 9. Threats to Validity
 
 ### 9.1 Internal Validity
-- **Measurement Jitter:** Network and scheduler jitter on single-node Minikube clusters could influence microsecond-level latency measurements. To mitigate this threat, all performance tests were preceded by warmup cycles, repeated across 200 iterations per concurrency level, and evaluated using non-parametric percentile distributions ($p_{50}, p_{90}, p_{95}, p_{99}$) rather than volatile arithmetic means alone.
+- **Measurement Jitter:** Network and scheduler jitter on single-node Minikube clusters could influence microsecond-level latency measurements. To mitigate this threat, all performance tests were preceded by warmup cycles, repeated across 200 iterations per concurrency level, and evaluated using non-parametric percentile distributions (p50, p90, p95, p99) rather than volatile arithmetic means alone.
 - **Background Resource Contention:** System background daemons were minimized, and CPU governors were set to performance mode during benchmark runs.
 
 ### 9.2 External Validity
@@ -402,10 +417,10 @@ To resolve this challenge, we developed an independent research extension locate
 ## 10. Conclusion and Future Work
 
 In this paper, we conducted an empirical study investigating the security containment and performance trade-offs of Zero Trust Architecture in cloud-native microservices. By combining rigorous penetration testing with multi-tier load benchmarking on a 14-service application, we demonstrated that:
-1. **Mutual TLS alone provides an illusion of security:** STRICT mTLS ($C_1$) fails to block internal lateral movement or database exfiltration ($LMCR = 0\%, DSIS = 0\%$) because cryptographic identity is accepted indiscriminately within the mesh.
-2. **Layered Zero Trust ($C_2$) achieves comprehensive containment:** Pairing mTLS with Layer 7 authorization policies and Layer 3/4 network micro-segmentation blocks 88.9% of lateral attack paths and completely protects backend persistence tiers ($DSIS = 100\%$).
-3. **The performance cost of Layer 7 policies is statistically negligible:** Evaluating granular RBAC tables incurs no statistically significant latency inflation over mTLS alone ($p = 0.428$). Furthermore, under high concurrency ($N = 50$), Envoy's connection pooling reduces tail latency by 27.8% relative to unmanaged baseline connections.
-4. **Sidecar memory scales linearly:** Envoy sidecar proxies require $\approx 34.2\text{ MiB}$ per pod, representing $<3.5\%$ of standard enterprise cluster capacities.
+1. **Mutual TLS alone provides an illusion of security:** STRICT mTLS (C1) fails to block internal lateral movement or database exfiltration (LMCR = 0%, DSIS = 0%) because cryptographic identity is accepted indiscriminately within the mesh.
+2. **Layered Zero Trust (C2) achieves comprehensive containment:** Pairing mTLS with Layer 7 authorization policies and Layer 3/4 network micro-segmentation blocks 88.89% of lateral attack paths and completely protects backend persistence tiers (DSIS = 100%).
+3. **The performance cost of Layer 7 policies is statistically negligible:** Evaluating granular RBAC tables incurs no statistically significant latency inflation over mTLS alone (*p* = 0.428). Furthermore, under high concurrency (N = 50), Envoy's connection pooling reduces tail latency by 27.8% relative to unmanaged baseline connections.
+4. **Sidecar memory scales linearly:** Envoy sidecar proxies require ~34.2 MiB per pod, representing < 3.5% of standard enterprise cluster capacities.
 
 Future extensions of this work include investigating kernel-bypass Zero Trust architectures utilizing eBPF (e.g., Cilium Service Mesh) to eliminate user-space proxy hops, evaluating Zero Trust resilience against compromised service mesh control planes, and extending our policy synthesizer with reinforcement learning to dynamically adapt access rules under shifting workload behaviors.
 

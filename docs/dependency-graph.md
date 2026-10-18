@@ -67,7 +67,7 @@ graph TD
 
 ## 3. Comprehensive Service Dependency Matrix
 
-The table below catalogs every legitimate communication path permitted within the Zero Trust policy matrix ($C_2$).
+The table below catalogs every legitimate communication path permitted within the Zero Trust policy matrix (C2).
 
 | Caller Service (Source) | Source ServiceAccount | Callee Service (Destination) | Destination ServiceAccount | Port / Protocol | Allowed Endpoints / Paths | Business Justification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -94,7 +94,7 @@ The table below catalogs every legitimate communication path permitted within th
 
 Any connection not listed in the matrix above is classified as **Unauthorized**. The table below highlights key lateral paths tested during security experiments:
 
-| Attack Vector | Source Service | Target Service | Normal Relationship | Expected $C_0$ (Perimeter) | Expected $C_1$ (STRICT mTLS) | Expected $C_2$ (Layered ZTA) |
+| Attack Vector | Source Service | Target Service | Normal Relationship | Expected C0 (Perimeter) | Expected C1 (STRICT mTLS) | Expected C2 (Layered ZTA) |
 | :--- | :--- | :--- | :--- | :---: | :---: | :---: |
 | **Direct DB Exfiltration** | `front-end` | `orders-db` | **Forbidden** | 🔴 Connected (Open) | 🔴 Connected (Open) | 🟢 **BLOCKED (Drop/Denied)** |
 | **Direct DB Exfiltration** | `front-end` | `carts-db` | **Forbidden** | 🔴 Connected (Open) | 🔴 Connected (Open) | 🟢 **BLOCKED (Drop/Denied)** |

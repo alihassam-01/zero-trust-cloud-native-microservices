@@ -10,8 +10,8 @@
 ## 1. Problem Statement: The Policy Definition Bottleneck
 
 In our empirical research study (*Evaluating Security Effectiveness and Performance Trade-offs of Zero Trust in Cloud-Native Microservices*), we demonstrated two pivotal realities:
-1. **The "mTLS Illusion":** Mutual TLS alone provides an $LMCR$ and $DSIS$ of exactly **0.00%**, leaving internal clusters fully vulnerable to lateral movement.
-2. **The Layer 7 Mandate:** Enforcing Layer 7 `AuthorizationPolicy` and Layer 3/4 `NetworkPolicy` objects achieves **88.9% - 100%** lateral containment at **zero statistically significant latency overhead ($p = 0.428$)**.
+1. **The "mTLS Illusion":** Mutual TLS alone provides an LMCR and DSIS of exactly **0.00%**, leaving internal clusters fully vulnerable to lateral movement.
+2. **The Layer 7 Mandate:** Enforcing Layer 7 `AuthorizationPolicy` and Layer 3/4 `NetworkPolicy` objects achieves **88.89% - 100%** lateral containment at **zero statistically significant latency overhead (*p* = 0.428)**.
 
 However, the primary barrier preventing enterprise organizations from adopting Layer 7 Zero Trust is **operational complexity**. Manually writing, testing, and maintaining granular authorization rules across dozens or hundreds of ephemeral microservices is labor-intensive and prone to human error. A single misplaced regex or missing path can cause catastrophic service outages.
 
@@ -66,9 +66,9 @@ To solve this operational bottleneck, this research extension provides an **auto
 
 ### 3.1 Path Normalization & Wildcarding
 Dynamic web applications frequently embed item identifiers, session IDs, and UUIDs into URI paths:
-- `/catalogue/3395a43e-2d88-40de-b95f-e00e1502085e` $\to$ `/catalogue/*`
-- `/cart/item/104` $\to$ `/cart/item/*`
-- `/customers/648a123f-.../cards` $\to$ `/customers/*/cards`
+- `/catalogue/3395a43e-2d88-40de-b95f-e00e1502085e` → `/catalogue/*`
+- `/cart/item/104` → `/cart/item/*`
+- `/customers/648a123f-.../cards` → `/customers/*/cards`
 
 The `TrafficAnalyzer` uses regex substitution to detect UUIDs (`[0-9a-f]{8}-...`), hex hashes, and numeric path segments, collapsing unbounded URL variations into compact wildcard patterns acceptable by Envoy RBAC regex filters.
 

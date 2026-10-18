@@ -11,9 +11,9 @@
 
 The empirical results generated from our automated security evaluation suite reveal three primary insights regarding cloud-native microservice defense:
 
-1. **Empirical Validation of Hypothesis $H_{1a}$ (Perimeter Inadequacy):** In a traditional perimeter-only architecture ($C_0$), once an adversary establishes initial execution inside a public-facing container, the internal network is completely unprotected. The attacker successfully reached 100% of internal services, databases, and message brokers ($\text{LMCR} = 0.00\%$, $\text{DSIS} = 0.00\%$).
-2. **Empirical Validation of Hypothesis $H_{1b}$ (The "mTLS Illusion"):** Enforcing STRICT mutual TLS across all microservice pods ($C_1$) encrypts traffic and establishes cryptographic workload identities (SPIFFE X.509 certificates). However, **mTLS alone provided zero reduction in lateral movement reachability** ($\text{LMCR} = 0.00\%$). Because the compromised front-end workload was authenticated to the mesh, target sidecars accepted connections and allowed direct access to payment APIs and internal databases.
-3. **Empirical Validation of Hypothesis $H_{1c}$ (Layered Defense Efficacy):** Combining STRICT mTLS with fine-grained L7 `AuthorizationPolicy` rules and defense-in-depth L3/L4 `NetworkPolicy` segmentations ($C_2$) successfully contained lateral movement ($\text{LMCR} \ge 88.9\%$, $\text{DSIS} = 100.0\%$), reducing data store blast radius to zero without impacting legitimate storefront functionality.
+1. **Empirical Validation of Hypothesis H1a (Perimeter Inadequacy):** In a traditional perimeter-only architecture (C0), once an adversary establishes initial execution inside a public-facing container, the internal network is completely unprotected. The attacker successfully reached 100% of internal services, databases, and message brokers (LMCR = 0.00%, DSIS = 0.00%).
+2. **Empirical Validation of Hypothesis H1b (The "mTLS Illusion"):** Enforcing STRICT mutual TLS across all microservice pods (C1) encrypts traffic and establishes cryptographic workload identities (SPIFFE X.509 certificates). However, **mTLS alone provided zero reduction in lateral movement reachability** (LMCR = 0.00%). Because the compromised front-end workload was authenticated to the mesh, target sidecars accepted connections and allowed direct access to payment APIs and internal databases.
+3. **Empirical Validation of Hypothesis H1c (Layered Defense Efficacy):** Combining STRICT mTLS with fine-grained L7 `AuthorizationPolicy` rules and defense-in-depth L3/L4 `NetworkPolicy` segmentations (C2) successfully contained lateral movement (LMCR ≥ 88.89%, DSIS = 100.00%), reducing data store blast radius to zero without impacting legitimate storefront functionality.
 
 ---
 
@@ -22,12 +22,12 @@ The empirical results generated from our automated security evaluation suite rev
 A widespread misconception among cloud practitioners and commercial security vendors is that adopting a service mesh with mutual TLS fulfills the requirements of Zero Trust Architecture.
 
 Our controlled experiments directly disprove this assumption:
-- In Scenario $C_1$, every workload in the `sock-shop` namespace was injected with an Envoy sidecar proxy.
+- In Scenario C1, every workload in the `sock-shop` namespace was injected with an Envoy sidecar proxy.
 - Istio Citadel dynamically provisioned short-lived X.509 certificates asserting identity:
   `URI: spiffe://cluster.local/ns/sock-shop/sa/front-end`
 - When the attacker inside `front-end` initiated an unauthorized connection to `payment:80/paymentAuth` or `orders-db:27017`, the outbound traffic was intercepted by the local Envoy sidecar.
 - The local Envoy initiated a mutual TLS handshake with the destination Envoy sidecar on `payment` or `orders-db`. Both sidecars successfully validated each other's certificate chain against `istio-ca-root-cert`.
-- **Because $C_1$ lacked explicit authorization policies, the destination Envoy evaluated the connection as "Authenticated" and immediately forwarded the traffic to the application container.**
+- **Because C1 lacked explicit authorization policies, the destination Envoy evaluated the connection as "Authenticated" and immediately forwarded the traffic to the application container.**
 
 ```
                                THE "mTLS ILLUSION" PARADOX
@@ -49,9 +49,9 @@ Local Envoy Sidecar
 
 ---
 
-## 3. Defense-in-Depth Mechanisms in Scenario $C_2$
+## 3. Defense-in-Depth Mechanisms in Scenario C2
 
-In Scenario $C_2$, security is enforced through two complementary layers:
+In Scenario C2, security is enforced through two complementary layers:
 
 ### 3.1 Layer 7 Authorization Policies (Istio `AuthorizationPolicy`)
 - Istio evaluates HTTP attributes (method, URI path, headers) in conjunction with caller identity (`source.principals`).
@@ -62,7 +62,7 @@ In Scenario $C_2$, security is enforced through two complementary layers:
 
 ### 3.2 Layer 4 RBAC and Network Policies
 - For non-HTTP TCP connections (e.g., MongoDB on port 27017, MySQL on port 3306):
-  - In Scenario $C_2$, Envoy maintains an L4 network RBAC filter (`envoy.filters.network.rbac`).
+  - In Scenario C2, Envoy maintains an L4 network RBAC filter (`envoy.filters.network.rbac`).
   - When the attacker opens a raw TCP socket and writes a payload, Envoy inspects the cryptographic principal and immediately resets the socket (`ECONNRESET`).
   - In parallel, Kubernetes `NetworkPolicy` drops unauthorized TCP packets at the kernel packet-filtering level, ensuring that even if a sidecar proxy is bypassed, the Linux kernel prevents cross-pod socket establishment.
 

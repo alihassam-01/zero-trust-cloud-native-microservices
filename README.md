@@ -20,27 +20,25 @@ Modern enterprise applications rely heavily on microservice architectures orches
 
 **Zero Trust Architecture (ZTA)**, formalized by **NIST SP 800-207**, advocates *"never trust, always verify"*. While service meshes (Istio/Envoy) are standard tools for implementing ZTA, empirical literature has lacked rigorous quantification of both **containment efficacy** and **runtime overhead**.
 
-This repository contains an end-to-end, fully reproducible empirical research study evaluating Zero Trust on an enterprise-scale 14-microservice cloud-native application ([Sock Shop](https://github.com/microservices-demo/microservices-demo)).
+This repository contains an end-to-end, fully reproducible empirical research study evaluating Zero Trust on an enterprise-scale 14-microservice cloud-native application ([Sock Shop](https://github.com/microservices-demo/microservices-demo)).### Key Findings at a Glance
 
-### Key Findings at a Glance
-
-| Security Metric / Resource Cost | $C_0$: Baseline Perimeter | $C_1$: STRICT mTLS Only | $C_2$: Layered Zero Trust |
+| Security Metric / Resource Cost | C0: Baseline Perimeter | C1: STRICT mTLS Only | C2: Layered Zero Trust |
 | :--- | :---: | :---: | :---: |
-| **Lateral Movement Containment ($LMCR$)** | **0.00%** (0/9 blocked) | **0.00%** (0/9 blocked) | **88.89%** (8/9 blocked) |
-| **Data Store Isolation ($DSIS$)** | **0.00%** (0/5 protected) | **0.00%** (0/5 protected) | **100.00%** (5/5 protected) |
+| **Lateral Movement Containment (LMCR)** | **0.00%** (0/9 blocked) | **0.00%** (0/9 blocked) | **88.89%** (8/9 blocked) |
+| **Data Store Isolation (DSIS)** | **0.00%** (0/5 protected) | **0.00%** (0/5 protected) | **100.00%** (5/5 protected) |
 | **Wire Encryption (Confidentiality)** | ❌ Plaintext | ✅ TLS 1.3 | ✅ TLS 1.3 |
 | **Workload Identity (SPIFFE SVID)** | ❌ None | ✅ Cryptographic | ✅ Cryptographic |
 | **Layer 7 Authorization Policies** | ❌ None | ❌ None (Implicit Allow) | ✅ Granular Least-Privilege |
 | **Layer 3/4 Packet Filtering** | ❌ Flat Overlay | ❌ Flat Overlay | ✅ NetworkPolicies |
 | **Sidecar Memory Overhead (per pod)** | **0 MiB** | ~34.2 MiB | ~34.2 MiB |
-| **Tail Latency ($p_{99}$) under High Concurrency ($N=50$)** | 881.72 ms | 718.97 ms | **636.18 ms** (-27.8%) |
-| **Incremental Latency Penalty ($C_1 \to C_2$)** | N/A | Baseline Mesh | **Statistically Negligible ($p = 0.428$)** |
+| **Tail Latency (p99) under High Concurrency (N=50)** | 881.72 ms | 718.97 ms | **636.18 ms** (-27.8%) |
+| **Incremental Latency Penalty (C1 → C2)** | N/A | Baseline Mesh | **Statistically Negligible (*p* = 0.428)** |
 
 ### 🚨 Critical Discovery: The "mTLS Illusion"
-A pivotal finding of this research is that **STRICT mutual TLS ($C_1$) provides zero defense against internal lateral movement.** 
-Because target sidecars accept all authenticated identities in the mesh by default without Layer 7 authorization, a compromised pod inside the cluster can invoke payment processing, administrative endpoints, and raw database ports without resistance ($LMCR = 0\%, DSIS = 0\%$). 
+A pivotal finding of this research is that **STRICT mutual TLS (C1) provides zero defense against internal lateral movement.** 
+Because target sidecars accept all authenticated identities in the mesh by default without Layer 7 authorization, a compromised pod inside the cluster can invoke payment processing, administrative endpoints, and raw database ports without resistance (LMCR = 0%, DSIS = 0%). 
 
-Crucially, our statistical analysis proves that **adding Layer 7 AuthorizationPolicies ($C_2$) incurs zero additional memory and no statistically significant latency penalty ($p = 0.428$) over mTLS alone**. Stopping at mTLS alone is an architectural anti-pattern: you pay the full resource cost of the service mesh while gaining none of the lateral movement protection.
+Crucially, our statistical analysis proves that **adding Layer 7 AuthorizationPolicies (C2) incurs zero additional memory and no statistically significant latency penalty (*p* = 0.428) over mTLS alone**. Stopping at mTLS alone is an architectural anti-pattern: you pay the full resource cost of the service mesh while gaining none of the lateral movement protection.
 
 ---
 
@@ -49,15 +47,15 @@ Crucially, our statistical analysis proves that **adding Layer 7 AuthorizationPo
 All figures are generated directly from empirical test runs using `scripts/06_generate_charts.py` at publication quality (300 DPI):
 
 ### 1. Attack Containment Matrix & Heatmap
-Demonstrates how Layered ZTA ($C_2$) systematically neutralizes lateral movement, API bypasses, and direct database exfiltration where $C_0$ and $C_1$ completely fail.
+Demonstrates how Layered ZTA (C2) systematically neutralizes lateral movement, API bypasses, and direct database exfiltration where C0 and C1 completely fail.
 ![Attack Containment Heatmap](performance-experiments/figures/attack_containment_heatmap.png)
 
-### 2. Tail Latency Profiles ($p_{50}, p_{95}, p_{99}$) Across Concurrency Levels
-Illustrates latency scaling from single-user to heavy concurrency ($N=50$). Envoy connection pooling mitigates backend socket exhaustion under stress.
+### 2. Tail Latency Profiles (p50, p95, p99) Across Concurrency Levels
+Illustrates latency scaling from single-user to heavy concurrency (N=50). Envoy connection pooling mitigates backend socket exhaustion under stress.
 ![Latency Comparison](performance-experiments/figures/latency_comparison_p50_p95_p99.png)
 
 ### 3. Throughput Scalability (RPS vs Concurrency)
-Throughput scales smoothly across all architectures up to $N=25$, with $C_2$ tracking $C_1$ within 15% under saturated loads.
+Throughput scales smoothly across all architectures up to N=25, with C2 tracking C1 within 15% under saturated loads.
 ![Throughput vs Concurrency](performance-experiments/figures/throughput_vs_concurrency.png)
 
 ### 4. Sidecar Resource Allocation Footprint

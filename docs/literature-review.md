@@ -30,7 +30,7 @@ This literature review analyzes 12 foundational papers, standards, and empirical
 
 #### [2] NIST SP 800-207A: "A Zero Trust Architecture Model for Access Control in Cloud-Native Applications in Multi-Location Environments" (Barker, Chandramouli, 2023)
 - **Contribution:** Extends SP 800-207 explicitly to cloud-native, multi-tenant Kubernetes environments. Articulates how SPIFFE/SPIRE cryptographic identities should be mapped to workload identities and evaluated at L7.
-- **Relevance:** Defines the exact layered configuration adopted in our $C_2$ architecture, mandating both cryptographic identity verification and fine-grained authorization.
+- **Relevance:** Defines the exact layered configuration adopted in our C2 architecture, mandating both cryptographic identity verification and fine-grained authorization.
 
 #### [3] "Zero Trust Networks: Building Secure Systems in Untrusted Networks" (Gilman & Barth, O'Reilly Media, 2017)
 - **Contribution:** Early pioneering work formalizing that network location must never imply trust. Introduces the concept of authenticated control and data planes, ephemeral short-lived certificates, and dynamic trust scoring.
@@ -42,7 +42,7 @@ This literature review analyzes 12 foundational papers, standards, and empirical
 
 #### [4] NIST SP 800-204A: "Building Secure Microservices-based Applications Using Service-Mesh Architecture" (Chandramouli, 2020)
 - **Contribution:** Demonstrates that service mesh proxies (Envoy) serve as optimal transparent PEPs for microservices. Details how mTLS handles identity issuance, key rotation, and wire encryption without modifying application code.
-- **Relevance to our study:** Direct guide for our $C_1$ configuration. Emphasizes that mTLS secures the transport channel but explicitly highlights that application authorization requires distinct policy rules.
+- **Relevance to our study:** Direct guide for our C1 configuration. Emphasizes that mTLS secures the transport channel but explicitly highlights that application authorization requires distinct policy rules.
 
 #### [5] NIST SP 800-204B: "Attribute-based Access Control for Microservices-based Applications using a Service Mesh" (Chandramouli, 2021)
 - **Contribution:** Extends 800-204A by defining Attribute-Based Access Control (ABAC) and Role-Based Access Control (RBAC) schemas over service mesh data planes using HTTP headers, JWTs, and SPIFFE IDs.
@@ -89,9 +89,9 @@ This literature review analyzes 12 foundational papers, standards, and empirical
 
 The following matrix compares existing key studies against this research across six essential evaluation criteria:
 - **C1:** Empirical testbed with realistic multi-tier microservices (e.g., Sock Shop).
-- **C2:** Multi-stage security configurations ($C_0$ Baseline, $C_1$ mTLS, $C_2$ Layered ZTA).
+- **C2:** Multi-stage security configurations (C0 Baseline, C1 mTLS, C2 Layered ZTA).
 - **C3:** Active simulated lateral movement attack evaluation.
-- **C4:** Detailed tail latency distribution ($p_{50}, p_{90}, p_{95}, p_{99}$).
+- **C4:** Detailed tail latency distribution (p50, p90, p95, p99).
 - **C5:** Container CPU & memory sidecar resource profiling.
 - **C6:** Automated policy synthesis extension.
 
@@ -112,7 +112,7 @@ From this literature analysis, four distinct gaps emerge:
 
 1. **The "mTLS Conflation" Gap:** Extensive literature treats service mesh adoption as synonymous with Zero Trust. However, mTLS provides identity verification and channel encryption; it does **not** restrict access permissions. A compromised workload possessing a mesh certificate can still query any accessible service. There is a lack of empirical benchmarks verifying this gap under controlled conditions.
 2. **Dual-Evaluation Deficit:** Existing literature bifurcates into security papers (which ignore performance overheads) and performance engineering papers (which treat security policies as generic on/off switches without testing attack resistance).
-3. **Tail Latency Neglect:** Most cloud performance studies report average or median latency. In microservices where a single user request cascades through 5–10 downstream services, the **99th percentile ($p_{99}$) tail latency** determines the end-user experience. Quantifying $p_{99}$ inflation across ZTA layers is critical.
+3. **Tail Latency Neglect:** Most cloud performance studies report average or median latency. In microservices where a single user request cascades through 5–10 downstream services, the **99th percentile (p99) tail latency** determines the end-user experience. Quantifying p99 inflation across ZTA layers is critical.
 4. **Policy Operationalization Barrier:** While least-privilege policies are theoretically optimal, manual rule authoring is error-prone. There is a need for lightweight, traffic-informed policy synthesis tools that can be validated against both legitimate workloads and attack vectors.
 
 This research study addresses each of these four gaps directly.
