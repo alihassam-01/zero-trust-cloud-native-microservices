@@ -9,7 +9,6 @@
 
 **Author:** [Hassam Ali](https://github.com/Hassam-01)  
 **Email:** [ali.hassam1@outlook.com](mailto:ali.hassam1@outlook.com)  
-**Target Program:** Master of Science in Computer Science / Cloud & Systems Security  
 **Full Research Paper:** [docs/paper/zero_trust_microservices_evaluation.md](docs/paper/zero_trust_microservices_evaluation.md)
 
 ---

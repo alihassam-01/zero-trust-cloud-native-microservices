@@ -2,7 +2,6 @@
 
 **Principal Investigator / Author:** Hassam Ali  
 **Affiliation:** Independent Research Project  
-**Target Program:** Master of Science in Computer Science / Cloud & Systems Security  
 **Repository:** [Hassam-01/zero-trust-cloud-native-microservices](https://github.com/Hassam-01/zero-trust-cloud-native-microservices)  
 **Date:** October 2026  
 

@@ -1,7 +1,6 @@
 # Threat Model: Zero Trust Architecture in Cloud-Native Microservices
 
 **Author:** Hassam Ali  
-**Target Program:** Master of Science in Computer Science / Cloud & Systems Security  
 **Project:** Evaluating Security Effectiveness and Performance Trade-offs of Zero Trust in Cloud-Native Microservices  
 **Date:** October 2026  
 

@@ -3,7 +3,6 @@
 **Author:** Hassam Ali  
 **Email:** ali.hassam1@outlook.com  
 **GitHub:** [@Hassam-01](https://github.com/Hassam-01) / [zero-trust-cloud-native-microservices](https://github.com/Hassam-01/zero-trust-cloud-native-microservices)  
-**Target Specialization:** Master of Science in Computer Science / Cloud & Systems Security  
 **Date:** October 2026  
 
 ---
